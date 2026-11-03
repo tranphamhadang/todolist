@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover: cho phép dùng safe-area-inset trên iPhone có tai thỏ -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Việc của tôi</title>
+  <meta name="description" content="Danh sách việc cần làm cá nhân, hoạt động cả khi offline.">
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#1e3a5f" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121c2b" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+
+  <!-- iPhone/iPad: chạy toàn màn hình khi mở từ màn hình chính -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Việc của tôi">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <style>
+    /* ===== Màu sắc (sáng) ===== */
+    :root {
+      color-scheme: light dark;
+      --primary: #1e3a5f;
+      --primary-hover: #284b78;
+      --on-primary: #ffffff;
+      --header-bg: #1e3a5f;
+      --bg: #f4f6fa;
+      --surface: #ffffff;
+      --text: #1a2233;
+      --muted: #5b6678;
+      --border: #dde3ec;
+      --focus: #3b82f6;
+      --danger: #c62828;
+      --danger-bg: #fdecea;
+      --high: #d32f2f;
+      --medium: #e08600;
+      --low: #2e7d32;
+      --done-text: #8a94a6;
+      --shadow: 0 1px 3px rgba(16, 24, 40, .08);
+      --safe-l: max(16px, env(safe-area-inset-left));
+      --safe-r: max(16px, env(safe-area-inset-right));
+    }
+    /* ===== Màu sắc (tối) - tự theo cài đặt của máy ===== */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #3d6aa8;
+        --primary-hover: #4a7aba;
+        --header-bg: #121c2b;
+        --bg: #0d141f;
+        --surface: #172234;
+        --text: #e6ebf3;
+        --muted: #9aa6b8;
+        --border: #2a3850;
+        --focus: #7fb0ff;
+        --danger: #ff7b72;
+        --danger-bg: #3a1d1f;
+        --high: #ff6b6b;
+        --medium: #ffb547;
+        --low: #5fd38a;
+        --done-text: #6c788c;
+        --shadow: none;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      /* Không bị thanh home của iPhone che */
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    button, input, select { font: inherit; color: inherit; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+
+    /* ===== Thanh tiêu đề ===== */
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--header-bg);
+      color: #fff;
+      /* Không bị tai thỏ che */
+      padding: calc(env(safe-area-inset-top) + 12px) var(--safe-r) 12px var(--safe-l);
+    }
+    .header-inner {
+      max-width: 720px; margin: 0 auto;
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    }
+    h1 { margin: 0; font-size: 1.35rem; font-weight: 700; }
+    #counter { font-size: .95rem; opacity: .85; white-space: nowrap; }
+
+    main {
+      max-width: 720px; margin: 0 auto;
+      padding: 16px var(--safe-r) 24px var(--safe-l);
+    }
+
+    /* ===== Nút chung ===== */
+    .btn {
+      min-height: 44px; padding: 0 16px;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      touch-action: manipulation;
+    }
+    .btn:hover { border-color: var(--muted); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+    .btn.primary:hover { background: var(--primary-hover); }
+    .btn.danger { color: var(--danger); }
+    .icon-btn {
+      width: 44px; height: 44px; flex: none;
+      border: 0; border-radius: 10px; background: transparent;
+      color: var(--muted); font-size: 1.15rem; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
+    .icon-btn:hover { background: var(--bg); color: var(--text); }
+    .icon-btn.del:hover { color: var(--danger); background: var(--danger-bg); }
+
+    /* ===== Ô nhập liệu ===== */
+    .input, select.input {
+      width: 100%; min-height: 44px; padding: 8px 12px;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface);
+      font-size: 16px; /* >=16px để iPhone không tự phóng to */
+      min-width: 0;
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .field > span { font-size: .8rem; color: var(--muted); }
+
+    /* ===== Form thêm việc ===== */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; box-shadow: var(--shadow);
+    }
+    .add-form { padding: 12px; display: grid; gap: 10px; }
+    .add-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+    @media (max-width: 420px) {
+      .add-row { grid-template-columns: 1fr 1fr; }
+      .add-row .btn { grid-column: 1 / -1; }
+    }
+
+    /* ===== Bộ lọc ===== */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 16px 0 8px; flex-wrap: wrap; }
+    .filters { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3px; }
+    .filters button {
+      min-height: 40px; padding: 0 14px; border: 0; border-radius: 9px;
+      background: transparent; color: var(--muted); cursor: pointer; touch-action: manipulation;
+    }
+    .filters button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+
+    /* ===== Danh sách việc ===== */
+    .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .item {
+      display: flex; align-items: center; gap: 2px;
+      padding: 4px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 5px solid var(--medium);
+      border-radius: 12px; box-shadow: var(--shadow);
+    }
+    .item.p-high { border-left-color: var(--high); }
+    .item.p-low { border-left-color: var(--low); }
+    .item.dragging { opacity: .6; outline: 2px dashed var(--primary); }
+    .item.overdue { background: var(--danger-bg); border-color: var(--danger); border-left-color: var(--danger); }
+    .item.overdue .text, .item.overdue .due { color: var(--danger); }
+
+    .handle { cursor: grab; touch-action: none; font-size: 1.3rem; }
+    .handle:active { cursor: grabbing; }
+
+    /* Ô tích tự vẽ, vùng bấm 44x44 */
+    .check { width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+    .check input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+    .check .box {
+      width: 24px; height: 24px; border: 2px solid var(--muted); border-radius: 7px;
+      display: inline-flex; align-items: center; justify-content: center; transition: background .15s;
+    }
+    .check input:checked + .box { background: var(--primary); border-color: var(--primary); }
+    .check input:checked + .box::after {
+      content: ""; width: 6px; height: 12px; margin-top: -3px;
+      border: solid #fff; border-width: 0 3px 3px 0; transform: rotate(45deg);
+    }
+    .check input:focus-visible + .box { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+    .body { flex: 1; min-width: 0; padding: 6px 4px; cursor: text; touch-action: manipulation; }
+    .text { overflow-wrap: anywhere; white-space: pre-wrap; }
+    .item.done .text { text-decoration: line-through; color: var(--done-text); }
+    .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 2px; font-size: .8rem; color: var(--muted); }
+    .badge { font-weight: 600; }
+    .badge-high { color: var(--high); }
+    .badge-medium { color: var(--medium); }
+    .badge-low { color: var(--low); }
+    .due.overdue-text { font-weight: 700; }
+
+    /* Chế độ sửa */
+    .item.editing { display: block; padding: 10px; }
+    .edit-form { display: grid; gap: 10px; }
+    .edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    .empty { text-align: center; color: var(--muted); padding: 28px 8px; margin: 0; }
+
+    /* ===== Hành động cuối trang ===== */
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+    .actions .btn { flex: 1 1 140px; }
+    .actions #clearDone { flex-basis: 100%; }
+    .hint { color: var(--muted); font-size: .85rem; margin: 16px 0 0; text-align: center; }
+
+    /* ===== Thông báo nhỏ (toast) ===== */
+    .toast {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(16px + env(safe-area-inset-bottom));
+      width: max-content; max-width: calc(100% - 32px);
+      background: #1a2233; color: #fff; border-radius: 12px;
+      padding: 8px 8px 8px 16px; display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 50;
+    }
+    .toast[hidden] { display: none; }
+    .toast button {
+      min-height: 40px; padding: 0 12px; border: 0; border-radius: 8px;
+      background: rgba(255,255,255,.15); color: #fff; font-weight: 600; cursor: pointer;
+    }
+    @media (prefers-color-scheme: dark) { .toast { background: #e6ebf3; color: #0d141f; } .toast button { background: rgba(0,0,0,.1); color: #0d141f; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Việc của tôi</h1>
+      <span id="counter" aria-live="polite"></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Form thêm việc: Enter trong ô nhập hoặc bấm "Thêm" -->
+    <form id="addForm" class="card add-form" autocomplete="off">
+      <label class="sr-only" for="newText">Việc cần làm</label>
+      <input id="newText" class="input" type="text" maxlength="500" placeholder="Thêm việc cần làm..." enterkeyhint="done">
+      <div class="add-row">
+        <label class="field">
+          <span>Ưu tiên</span>
+          <select id="newPriority" class="input">
+            <option value="high">Cao</option>
+            <option value="medium" selected>Trung bình</option>
+            <option value="low">Thấp</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Hạn chót</span>
+          <input id="newDue" class="input" type="date">
+        </label>
+        <button type="submit" class="btn primary">Thêm</button>
+      </div>
+    </form>
+
+    <div class="toolbar">
+      <div class="filters" role="group" aria-label="Lọc danh sách">
+        <button type="button" data-filter="all">Tất cả</button>
+        <button type="button" data-filter="active">Chưa xong</button>
+        <button type="button" data-filter="done">Đã xong</button>
+      </div>
+    </div>
+
+    <ul id="list" class="list" aria-label="Danh sách việc"></ul>
+    <p id="empty" class="empty" hidden></p>
+
+    <div class="actions">
+      <button type="button" id="clearDone" class="btn danger">Xóa các việc đã xong</button>
+      <button type="button" id="exportBtn" class="btn">Xuất JSON</button>
+      <button type="button" id="importBtn" class="btn">Nhập JSON</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+    <p class="hint">Nhấn đúp vào việc để sửa. Giữ biểu tượng ⠿ rồi kéo để sắp xếp.</p>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span id="toastText"></span>
+    <button type="button" id="toastBtn" hidden></button>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // ===== Hằng số & trạng thái =====
+    var STORAGE_KEY = 'viec-cua-toi.todos.v1';
+    var FILTER_KEY = 'viec-cua-toi.filter';
+    var PRIORITIES = { high: 'Cao', medium: 'Trung bình', low: 'Thấp' };
+
+    var todos = [];          // mảng việc, thứ tự trong mảng = thứ tự hiển thị
+    var filter = 'all';      // all | active | done
+    var editingId = null;    // id việc đang sửa
+    var lastDeleted = null;  // để hoàn tác khi lỡ xóa
+
+    // ===== Phần tử giao diện =====
+    var $ = function (id) { return document.getElementById(id); };
+    var listEl = $('list'), emptyEl = $('empty'), counterEl = $('counter');
+    var addForm = $('addForm'), newText = $('newText'), newPriority = $('newPriority'), newDue = $('newDue');
+    var clearDoneBtn = $('clearDone'), exportBtn = $('exportBtn'), importBtn = $('importBtn'), importFile = $('importFile');
+    var toastEl = $('toast'), toastText = $('toastText'), toastBtn = $('toastBtn');
+    var filterBtns = document.querySelectorAll('[data-filter]');
+
+    // ===== Tiện ích =====
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function todayStr() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    function isValidDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime()); }
+    function formatDate(s) { var p = s.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+    function el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+
+    // ===== Lưu trữ an toàn =====
+    // Kiểm tra localStorage có dùng được không (chế độ ẩn danh/chặn cookie có thể làm lỗi)
+    var canStore = (function () {
+      try { var k = '__test__'; localStorage.setItem(k, k); localStorage.removeItem(k); return true; }
+      catch (e) { return false; }
+    })();
+
+    // Làm sạch 1 việc: dữ liệu lạ/thiếu sẽ được sửa về giá trị mặc định, không làm hỏng app
+    function sanitize(raw) {
+      if (!raw || typeof raw !== 'object') return null;
+      var text = typeof raw.text === 'string' ? raw.text.trim().slice(0, 500) : '';
+      if (!text) return null;
+      return {
+        id: typeof raw.id === 'string' && raw.id ? raw.id : uid(),
+        text: text,
+        done: raw.done === true,
+        priority: PRIORITIES.hasOwnProperty(raw.priority) ? raw.priority : 'medium',
+        due: isValidDate(raw.due) ? raw.due : '',
+        createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now()
+      };
+    }
+    function sanitizeList(arr) {
+      var seen = {}, out = [];
+      arr.forEach(function (r) {
+        var t = sanitize(r);
+        if (!t) return;
+        if (seen[t.id]) t.id = uid(); // tránh trùng id
+        seen[t.id] = true;
+        out.push(t);
+      });
+      return out;
+    }
+
+    function load() {
+      if (!canStore) {
+        setTimeout(function () { showToast('Trình duyệt đang chặn lưu dữ liệu. Việc sẽ mất khi đóng app.'); }, 300);
+        return [];
+      }
+      var raw = null;
+      try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { return []; }
+      if (!raw) return []; // lần đầu dùng: chưa có dữ liệu
+      try {
+        var data = JSON.parse(raw);
+        if (!Array.isArray(data)) throw new Error('Sai định dạng');
+        return sanitizeList(data);
+      } catch (e) {
+        // Dữ liệu hỏng: sao lưu bản gốc sang khóa khác rồi bắt đầu danh sách trống
+        try { localStorage.setItem(STORAGE_KEY + '.hong-' + Date.now(), raw); } catch (_) {}
+        setTimeout(function () { alert('Dữ liệu đã lưu bị lỗi nên không đọc được. Bản gốc đã được giữ lại riêng, app bắt đầu với danh sách trống.'); }, 300);
+        return [];
+      }
+    }
+
+    function save() {
+      if (!canStore) return;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); }
+      catch (e) { showToast('Không lưu được dữ liệu (bộ nhớ có thể đã đầy).'); }
+    }
+
+    // ===== Thông báo nhỏ =====
+    var toastTimer = null;
+    function showToast(message, actionLabel, onAction, persistent) {
+      toastText.textContent = message;
+      if (actionLabel) {
+        toastBtn.textContent = actionLabel;
+        toastBtn.hidden = false;
+        toastBtn.onclick = function () { hideToast(); onAction(); };
+      } else {
+        toastBtn.hidden = true;
+        toastBtn.onclick = null;
+      }
+      toastEl.hidden = false;
+      clearTimeout(toastTimer);
+      if (!persistent) toastTimer = setTimeout(hideToast, actionLabel ? 6000 : 3500);
+    }
+    function hideToast() { toastEl.hidden = true; }
+
+    // ===== Hiển thị =====
+    function visibleTodos() {
+      return todos.filter(function (t) {
+        return filter === 'all' || (filter === 'active' ? !t.done : t.done);
+      });
+    }
+
+    function render() {
+      var today = todayStr();
+      var visible = visibleTodos();
+      listEl.textContent = '';
+      visible.forEach(function (t) {
+        listEl.appendChild(t.id === editingId ? renderEditor(t) : renderItem(t, today));
+      });
+
+      // Thông báo khi danh sách trống
+      if (visible.length === 0) {
+        emptyEl.hidden = false;
+        emptyEl.textContent = todos.length === 0 ? 'Chưa có việc nào. Thêm việc đầu tiên ở ô phía trên.'
+          : filter === 'active' ? 'Không còn việc nào chưa xong.'
+          : 'Chưa có việc nào đã xong.';
+      } else {
+        emptyEl.hidden = true;
+      }
+
+      var left = todos.filter(function (t) { return !t.done; }).length;
+      counterEl.textContent = left === 0 ? 'Không còn việc nào' : 'Còn ' + left + ' việc';
+
+      filterBtns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.filter === filter)); });
+      clearDoneBtn.disabled = !todos.some(function (t) { return t.done; });
+    }
+
+    function iconBtn(symbol, label, action, extraCls) {
+      var b = el('button', 'icon-btn' + (extraCls ? ' ' + extraCls : ''));
+      b.type = 'button';
+      b.textContent = symbol;
+      b.setAttribute('aria-label', label);
+      b.title = label;
+      b.dataset.action = action;
+      return b;
+    }
+
+    // Một dòng việc ở chế độ xem
+    function renderItem(t, today) {
+      var li = el('li', 'item p-' + t.priority);
+      li.dataset.id = t.id;
+      var overdue = !t.done && t.due && t.due < today;
+      if (t.done) li.classList.add('done');
+      if (overdue) li.classList.add('overdue');
+
+      var handle = iconBtn('⠿', 'Kéo để sắp xếp (hoặc dùng phím mũi tên lên/xuống)', 'drag', 'handle');
+
+      var check = el('label', 'check');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = t.done;
+      cb.dataset.action = 'toggle';
+      cb.setAttribute('aria-label', (t.done ? 'Bỏ đánh dấu xong: ' : 'Đánh dấu xong: ') + t.text);
+      check.appendChild(cb);
+      check.appendChild(el('span', 'box'));
+
+      var body = el('div', 'body');
+      var text = el('div', 'text');
+      text.textContent = t.text; // dùng textContent để an toàn, không chạy mã lạ
+      var meta = el('div', 'meta');
+      var badge = el('span', 'badge badge-' + t.priority);
+      badge.textContent = PRIORITIES[t.priority];
+      meta.appendChild(badge);
+      if (t.due) {
+        var due = el('span', 'due');
+        if (overdue) { due.classList.add('overdue-text'); due.textContent = 'Quá hạn: ' + formatDate(t.due); }
+        else if (t.due === today && !t.done) due.textContent = 'Hạn: hôm nay';
+        else due.textContent = 'Hạn: ' + formatDate(t.due);
+        meta.appendChild(due);
+      }
+      body.appendChild(text);
+      body.appendChild(meta);
+
+      li.appendChild(handle);
+      li.appendChild(check);
+      li.appendChild(body);
+      li.appendChild(iconBtn('✎', 'Sửa', 'edit'));
+      li.appendChild(iconBtn('✕', 'Xóa', 'delete', 'del'));
+      return li;
+    }
+
+    // Một dòng việc ở chế độ sửa
+    function renderEditor(t) {
+      var li = el('li', 'item editing p-' + t.priority);
+      li.dataset.id = t.id;
+      var form = el('form', 'edit-form');
+
+      var input = el('input', 'input');
+      input.type = 'text';
+      input.maxLength = 500;
+      input.value = t.text;
+      input.setAttribute('aria-label', 'Nội dung việc');
+
+      var row = el('div', 'edit-row');
+      var pField = el('label', 'field');
+      var pLabel = el('span'); pLabel.textContent = 'Ưu tiên';
+      var sel = el('select', 'input');
+      Object.keys(PRIORITIES).forEach(function (k) {
+        var o = document.createElement('option');
+        o.value = k; o.textContent = PRIORITIES[k]; o.selected = k === t.priority;
+        sel.appendChild(o);
+      });
+      pField.appendChild(pLabel); pField.appendChild(sel);
+
+      var dField = el('label', 'field');
+      var dLabel = el('span'); dLabel.textContent = 'Hạn chót';
+      var date = el('input', 'input');
+      date.type = 'date';
+      date.value = t.due;
+      dField.appendChild(dLabel); dField.appendChild(date);
+      row.appendChild(pField); row.appendChild(dField);
+
+      var actions = el('div', 'edit-actions');
+      var cancel = el('button', 'btn'); cancel.type = 'button'; cancel.textContent = 'Hủy';
+      var ok = el('button', 'btn primary'); ok.type = 'submit'; ok.textContent = 'Lưu';
+      actions.appendChild(cancel); actions.appendChild(ok);
+
+      form.appendChild(input); form.appendChild(row); form.appendChild(actions);
+      li.appendChild(form);
+
+      function stopEditing() { editingId = null; render(); }
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var v = input.value.trim();
+        if (!v) {
+          if (confirm('Nội dung trống. Xóa việc này?')) { editingId = null; removeTodo(t.id); }
+          return;
+        }
+        t.text = v;
+        t.priority = sel.value;
+        t.due = isValidDate(date.value) ? date.value : '';
+        save();
+        stopEditing();
+      });
+      cancel.addEventListener('click', stopEditing);
+      form.addEventListener('keydown', function (e) { if (e.key === 'Escape') stopEditing(); });
+
+      // Đặt con trỏ vào cuối ô nhập sau khi hiển thị
+      setTimeout(function () { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 0);
+      return li;
+    }
+
+    // ===== Thao tác dữ liệu =====
+    function findTodo(id) { for (var i = 0; i < todos.length; i++) if (todos[i].id === id) return todos[i]; return null; }
+
+    function addTodo(text, priority, due) {
+      todos.unshift({ id: uid(), text: text, done: false, priority: priority, due: due, createdAt: Date.now() });
+      save();
+      render();
+    }
+
+    function removeTodo(id) {
+      var idx = todos.findIndex(function (t) { return t.id === id; });
+      if (idx < 0) return;
+      lastDeleted = { item: todos[idx], index: idx };
+      todos.splice(idx, 1);
+      save();
+      render();
+      showToast('Đã xóa việc.', 'Hoàn tác', function () {
+        if (!lastDeleted) return;
+        todos.splice(Math.min(lastDeleted.index, todos.length), 0, lastDeleted.item);
+        lastDeleted = null;
+        save();
+        render();
+      });
+    }
+
+    // Sắp xếp lại: chỉ đổi chỗ các việc đang hiển thị, việc bị ẩn bởi bộ lọc giữ nguyên vị trí
+    function applyVisibleOrder(ids) {
+      var idSet = {}; ids.forEach(function (id) { idSet[id] = true; });
+      var byId = {}; todos.forEach(function (t) { byId[t.id] = t; });
+      var slots = [];
+      todos.forEach(function (t, i) { if (idSet[t.id]) slots.push(i); });
+      var next = todos.slice();
+      slots.forEach(function (pos, k) { next[pos] = byId[ids[k]]; });
+      todos = next;
+    }
+
+    // ===== Sự kiện: thêm việc =====
+    addForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = newText.value.trim();
+      if (!text) { newText.focus(); return; }
+      addTodo(text, newPriority.value, isValidDate(newDue.value) ? newDue.value : '');
+      newText.value = '';
+      newDue.value = '';
+      newPriority.value = 'medium';
+      if (filter === 'done') { filter = 'all'; render(); } // để thấy ngay việc vừa thêm
+      newText.focus();
+    });
+
+    // ===== Sự kiện trên danh sách (dùng chung 1 bộ lắng nghe) =====
+    listEl.addEventListener('click', function (e) {
+      var target = e.target.closest('[data-action]');
+      if (!target) return;
+      var li = target.closest('li');
+      var id = li && li.dataset.id;
+      if (!id) return;
+      if (target.dataset.action === 'edit') { editingId = id; render(); }
+      else if (target.dataset.action === 'delete') removeTodo(id);
+    });
+
+    listEl.addEventListener('change', function (e) {
+      if (e.target.dataset.action !== 'toggle') return;
+      var t = findTodo(e.target.closest('li').dataset.id);
+      if (!t) return;
+      t.done = e.target.checked;
+      save();
+      render();
+    });
+
+    // Nhấn đúp vào nội dung để sửa
+    listEl.addEventListener('dblclick', function (e) {
+      var body = e.target.closest('.body');
+      if (!body) return;
+      editingId = body.closest('li').dataset.id;
+      render();
+    });
+
+    // ===== Kéo thả (Pointer Events: dùng được cả chuột lẫn cảm ứng) =====
+    var drag = null;
+    listEl.addEventListener('pointerdown', function (e) {
+      var handle = e.target.closest('.handle');
+      if (!handle || editingId) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.preventDefault();
+      drag = { li: handle.closest('li'), pointerId: e.pointerId };
+      drag.li.classList.add('dragging');
+      // Bắt con trỏ trên danh sách (phần tử không bị di chuyển) để không mất sự kiện khi kéo
+      try { listEl.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    listEl.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      e.preventDefault();
+      var y = e.clientY;
+      var others = listEl.querySelectorAll('li.item:not(.dragging)');
+      var before = null;
+      for (var i = 0; i < others.length; i++) {
+        var r = others[i].getBoundingClientRect();
+        if (y < r.top + r.height / 2) { before = others[i]; break; }
+      }
+      if (before) { if (drag.li.nextSibling !== before) listEl.insertBefore(drag.li, before); }
+      else if (listEl.lastElementChild !== drag.li) listEl.appendChild(drag.li);
+      // Tự cuộn khi kéo gần mép màn hình
+      if (y < 80) window.scrollBy(0, -12);
+      else if (y > window.innerHeight - 80) window.scrollBy(0, 12);
+    });
+    function endDrag(e) {
+      if (!drag || (e && e.pointerId !== drag.pointerId)) return;
+      drag.li.classList.remove('dragging');
+      var ids = Array.prototype.map.call(listEl.querySelectorAll('li.item'), function (li) { return li.dataset.id; });
+      drag = null;
+      applyVisibleOrder(ids);
+      save();
+      render();
+    }
+    listEl.addEventListener('pointerup', endDrag);
+    listEl.addEventListener('pointercancel', endDrag);
+
+    // Sắp xếp bằng bàn phím: đứng ở nút ⠿, bấm mũi tên lên/xuống
+    listEl.addEventListener('keydown', function (e) {
+      if (!e.target.classList.contains('handle')) return;
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      var li = e.target.closest('li');
+      var sibling = e.key === 'ArrowUp' ? li.previousElementSibling : li.nextElementSibling;
+      if (!sibling) return;
+      if (e.key === 'ArrowUp') listEl.insertBefore(li, sibling); else listEl.insertBefore(sibling, li);
+      var id = li.dataset.id;
+      applyVisibleOrder(Array.prototype.map.call(listEl.children, function (x) { return x.dataset.id; }));
+      save();
+      render();
+      var h = listEl.querySelector('li[data-id="' + id + '"] .handle');
+      if (h) h.focus();
+    });
+
+    // ===== Bộ lọc =====
+    filterBtns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        filter = b.dataset.filter;
+        editingId = null;
+        try { localStorage.setItem(FILTER_KEY, filter); } catch (_) {}
+        render();
+      });
+    });
+
+    // ===== Xóa các việc đã xong (có xác nhận) =====
+    clearDoneBtn.addEventListener('click', function () {
+      var n = todos.filter(function (t) { return t.done; }).length;
+      if (!n) return;
+      if (!confirm('Xóa ' + n + ' việc đã xong? Thao tác này không hoàn tác được.')) return;
+      todos = todos.filter(function (t) { return !t.done; });
+      editingId = null;
+      save();
+      render();
+      showToast('Đã xóa ' + n + ' việc.');
+    });
+
+    // ===== Xuất JSON =====
+    function downloadBlob(blob, name) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    }
+    exportBtn.addEventListener('click', function () {
+      var payload = { app: 'viec-cua-toi', version: 1, exportedAt: new Date().toISOString(), todos: todos };
+      var name = 'viec-cua-toi-' + todayStr() + '.json';
+      var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      // Trên điện thoại: ưu tiên bảng "Chia sẻ" (lưu vào Tệp, gửi Zalo, email...)
+      var isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (isTouch && navigator.canShare && typeof File === 'function') {
+        try {
+          var file = new File([blob], name, { type: 'application/json' });
+          if (navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: name }).catch(function (err) {
+              if (err && err.name !== 'AbortError') downloadBlob(blob, name);
+            });
+            return;
+          }
+        } catch (_) {}
+      }
+      downloadBlob(blob, name);
+    });
+
+    // ===== Nhập JSON =====
+    function readFileText(file) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(String(reader.result)); };
+        reader.onerror = function () { reject(reader.error); };
+        reader.readAsText(file);
+      });
+    }
+    importBtn.addEventListener('click', function () { importFile.click(); });
+    importFile.addEventListener('change', function () {
+      var file = importFile.files && importFile.files[0];
+      importFile.value = ''; // cho phép chọn lại cùng file lần sau
+      if (!file) return;
+      readFileText(file).then(function (text) {
+        var data;
+        try { data = JSON.parse(text); } catch (e) { alert('File không phải JSON hợp lệ.'); return; }
+        // Chấp nhận cả file do app xuất ({ todos: [...] }) lẫn mảng thuần [...]
+        var arr = Array.isArray(data) ? data : (data && Array.isArray(data.todos) ? data.todos : null);
+        if (!arr) { alert('Không tìm thấy danh sách việc trong file này.'); return; }
+        var list = sanitizeList(arr);
+        if (arr.length && !list.length) { alert('File không có việc nào hợp lệ.'); return; }
+        var skipped = arr.length - list.length;
+        var msg = 'File có ' + list.length + ' việc' + (skipped ? ' (bỏ qua ' + skipped + ' mục lỗi)' : '') +
+          '.\nNhập sẽ THAY THẾ toàn bộ ' + todos.length + ' việc hiện có.\n\nNên bấm "Xuất JSON" để sao lưu trước nếu chưa chắc. Tiếp tục?';
+        if (!confirm(msg)) return;
+        todos = list;
+        editingId = null;
+        filter = 'all';
+        save();
+        render();
+        showToast('Đã nhập ' + list.length + ' việc.');
+      }).catch(function () { alert('Không đọc được file.'); });
+    });
+
+    // Đồng bộ khi app mở ở nhiều tab cùng lúc
+    window.addEventListener('storage', function (e) {
+      if (e.key !== STORAGE_KEY) return;
+      todos = load();
+      editingId = null;
+      render();
+    });
+
+    // Cập nhật màu "quá hạn" khi mở lại app sang ngày mới
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && !editingId && !drag) render();
+    });
+
+    // ===== Khởi động =====
+    todos = load();
+    try {
+      var savedFilter = localStorage.getItem(FILTER_KEY);
+      if (savedFilter === 'all' || savedFilter === 'active' || savedFilter === 'done') filter = savedFilter;
+    } catch (_) {}
+    render();
+
+    // ===== Đăng ký service worker (chỉ chạy trên https hoặc localhost) =====
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+      var hadController = !!navigator.serviceWorker.controller;
+      var reloading = false;
+
+      // Khi bản mới đã sẵn sàng: hỏi người dùng có muốn cập nhật không
+      var promptUpdate = function (worker) {
+        showToast('Có phiên bản mới.', 'Cập nhật', function () { worker.postMessage({ type: 'SKIP_WAITING' }); }, true);
+      };
+
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(function (reg) {
+          if (reg.waiting && navigator.serviceWorker.controller) promptUpdate(reg.waiting);
+          reg.addEventListener('updatefound', function () {
+            var nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', function () {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) promptUpdate(nw);
+            });
+          });
+          // Mỗi lần quay lại app, kiểm tra xem có bản mới không
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') reg.update().catch(function () {});
+          });
+        }).catch(function (err) { console.warn('Không đăng ký được service worker:', err); });
+      });
+
+      // Bản mới đã kích hoạt -> tải lại trang 1 lần (bỏ qua lần cài đặt đầu tiên)
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!hadController || reloading) return;
+        reloading = true;
+        location.reload();
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

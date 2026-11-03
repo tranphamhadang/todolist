@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Nền vuông kín, không bo góc: hệ điều hành sẽ tự bo/cắt theo hình dạng của nó -->
+  <rect width="512" height="512" fill="#1e3a5f"/>
+  <!-- Ô vuông + dấu tick, nằm gọn trong vùng an toàn 60% ở giữa (để dùng được làm icon "maskable") -->
+  <rect x="150" y="150" width="212" height="212" rx="40" fill="none" stroke="#ffffff" stroke-width="26"/>
+  <path d="M198 258 L242 302 L322 208" fill="none" stroke="#7fd1a8" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
